@@ -79,10 +79,9 @@ class Hunyuan3DOperator(bpy.types.Operator):
     octree_resolution = 256
     num_inference_steps = 20
     guidance_scale = 5.5
-    texture = False  # 新增属性
+    texture = False
     selected_mesh_base64 = ""
-    selected_mesh = None  # 新增属性，用于存储选中的 mesh
-
+    selected_mesh = None
     thread = None
     task_finished = False
 
@@ -99,7 +98,6 @@ class Hunyuan3DOperator(bpy.types.Operator):
         return {'PASS_THROUGH'}
 
     def invoke(self, context, event):
-        # 启动线程
         props = context.scene.gen_3d_props
         self.prompt = props.prompt
         self.api_url = props.api_url
@@ -107,13 +105,12 @@ class Hunyuan3DOperator(bpy.types.Operator):
         self.octree_resolution = props.octree_resolution
         self.num_inference_steps = props.num_inference_steps
         self.guidance_scale = props.guidance_scale
-        self.texture = props.texture  # 获取 texture 属性的值
+        self.texture = props.texture 
 
         if self.prompt == "" and self.image_path == "":
             self.report({'WARNING'}, "Please enter some text or select an image first.")
             return {'FINISHED'}
 
-        # 保存选中的 mesh 对象引用
         for obj in context.selected_objects:
             if obj.type == 'MESH':
                 self.selected_mesh = obj
@@ -131,7 +128,6 @@ class Hunyuan3DOperator(bpy.types.Operator):
 
         props.is_processing = True
 
-        # 将相对路径转换为相对于 Blender 文件所在目录的绝对路径
         blend_file_dir = os.path.dirname(bpy.data.filepath)
         self.report({'INFO'}, f"blend_file_dir {blend_file_dir}")
         self.report({'INFO'}, f"image_path {self.image_path}")
@@ -218,7 +214,7 @@ class Hunyuan3DOperator(bpy.types.Operator):
                             "octree_resolution": self.octree_resolution,
                             "num_inference_steps": self.num_inference_steps,
                             "guidance_scale": self.guidance_scale,
-                            "texture": self.texture  # 传递 texture 参数
+                            "texture": self.texture
                         },
                     )
             self.report({'INFO'}, f"Post Done")
