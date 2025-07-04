@@ -1,4 +1,12 @@
-
+bl_info = {
+    "name": "Hunyuan3D-2 Prototipo",
+    "author": "Luisfelipe Rodrigo",
+    "version": (1, 0),
+    "blender": (3, 0, 0),
+    "location": "View3D > Sidebar > Hunyuan3D-2 3D Generator",
+    "description": "Generate/Texturing 3D models from images",
+    "category": "3D View",
+}
 import base64
 import os
 import tempfile
@@ -14,30 +22,29 @@ class Hunyuan3DProperties(bpy.types.PropertyGroup):
         name="Text Prompt",
         description="Describe what you want to generate",
         default=""
-    ) # type: ignore
+    )
     api_url: StringProperty(
         name="API URL",
         description="URL of the Text-to-3D API service",
         default="http://localhost:8080"
-    ) # type: ignore
+    )
     is_processing: BoolProperty(
         name="Processing",
         default=False
-    ) # type: ignore
+    )
     job_id: StringProperty(
         name="Job ID",
         default=""
-    ) # type: ignore
+    )
     status_message: StringProperty(
         name="Status Message",
         default=""
-    ) # type: ignore
+    )
     image_path: StringProperty(
         name="Image",
         description="Select an image to upload",
         subtype='FILE_PATH'
-    ) # type: ignore
-
+    )
     octree_resolution: IntProperty(
         name="Octree Resolution",
         description="Octree resolution for the 3D generation",
@@ -59,7 +66,6 @@ class Hunyuan3DProperties(bpy.types.PropertyGroup):
         min=1.0,
         max=10.0
     )
-
     texture: BoolProperty(
         name="Generate Texture",
         description="Whether to generate texture for the 3D model",
@@ -82,6 +88,7 @@ class Hunyuan3DOperator(bpy.types.Operator):
     texture = False
     selected_mesh_base64 = ""
     selected_mesh = None
+
     thread = None
     task_finished = False
 
@@ -98,6 +105,7 @@ class Hunyuan3DOperator(bpy.types.Operator):
         return {'PASS_THROUGH'}
 
     def invoke(self, context, event):
+        # 启动线程
         props = context.scene.gen_3d_props
         self.prompt = props.prompt
         self.api_url = props.api_url
@@ -105,7 +113,7 @@ class Hunyuan3DOperator(bpy.types.Operator):
         self.octree_resolution = props.octree_resolution
         self.num_inference_steps = props.num_inference_steps
         self.guidance_scale = props.guidance_scale
-        self.texture = props.texture 
+        self.texture = props.texture
 
         if self.prompt == "" and self.image_path == "":
             self.report({'WARNING'}, "Please enter some text or select an image first.")
@@ -144,14 +152,14 @@ class Hunyuan3DOperator(bpy.types.Operator):
             props.status_message = f"Generating {mesh_type} with {prompt_type}...\n" \
                                    "This may take several minutes depending \n on your GPU power."
 
-        self.thread = threading.Thread(target=self.generate_model, args=[context])
+        self.thread = threading.Thread(target=self.generate_model)
         self.thread.start()
 
         wm = context.window_manager
         wm.modal_handler_add(self)
         return {'RUNNING_MODAL'}
 
-    def generate_model(self, context):
+    def generate_model(self):
         self.report({'INFO'}, f"Generation Start")
         base_url = self.api_url.rstrip('/')
 
@@ -159,6 +167,7 @@ class Hunyuan3DOperator(bpy.types.Operator):
             if self.selected_mesh_base64 and self.texture:
                 if self.image_path and os.path.exists(self.image_path):
                     self.report({'INFO'}, f"Post Texturing with Image")
+                    
                     with open(self.image_path, "rb") as file:
                         image_data = file.read()
                     img_b64_str = base64.b64encode(image_data).decode()
@@ -183,7 +192,7 @@ class Hunyuan3DOperator(bpy.types.Operator):
                             "octree_resolution": self.octree_resolution,
                             "num_inference_steps": self.num_inference_steps,
                             "guidance_scale": self.guidance_scale,
-                            "texture": self.texture 
+                            "texture": self.texture
                         },
                     )
             else:
@@ -202,7 +211,7 @@ class Hunyuan3DOperator(bpy.types.Operator):
                             "octree_resolution": self.octree_resolution,
                             "num_inference_steps": self.num_inference_steps,
                             "guidance_scale": self.guidance_scale,
-                            "texture": self.texture  
+                            "texture": self.texture
                         },
                     )
                 else:
@@ -214,22 +223,21 @@ class Hunyuan3DOperator(bpy.types.Operator):
                             "octree_resolution": self.octree_resolution,
                             "num_inference_steps": self.num_inference_steps,
                             "guidance_scale": self.guidance_scale,
-                            "texture": self.texture
+                            "texture": self.texture 
                         },
                     )
             self.report({'INFO'}, f"Post Done")
-            self.task_finished = True
-            props = context.scene.gen_3d_props
-            props.is_processing = False
 
             if response.status_code != 200:
                 self.report({'ERROR'}, f"Generation failed: {response.text}")
                 return
 
+            # Decode base64 and save to temporary file
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".glb")
             temp_file.write(response.content)
             temp_file.close()
 
+            # Import the GLB file in the main thread
             def import_handler():
                 bpy.ops.import_scene.gltf(filepath=temp_file.name)
                 os.unlink(temp_file.name)
@@ -252,28 +260,26 @@ class Hunyuan3DOperator(bpy.types.Operator):
 
         finally:
             self.task_finished = True
-            props = context.scene.gen_3d_props
-            props.is_processing = False
             self.selected_mesh_base64 = ""
 
 
 class Hunyuan3DPanel(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = 'Hunyuan3D-2'
-    bl_label = 'Hunyuan3D-2 3D Generator'
+    bl_category = 'Hunyuan3D-2 Prototipo'
+    bl_label = 'Hunyuan3D-2 3D Prototipo'
 
     def draw(self, context):
         layout = self.layout
         props = context.scene.gen_3d_props
 
         layout.prop(props, "api_url")
-        layout.prop(props, "prompt")
+        #layout.prop(props, "prompt")
         layout.prop(props, "image_path")
         layout.prop(props, "octree_resolution")
         layout.prop(props, "num_inference_steps")
         layout.prop(props, "guidance_scale")
-        layout.prop(props, "texture")
+        #layout.prop(props, "texture")
 
         row = layout.row()
         row.enabled = not props.is_processing
@@ -308,5 +314,3 @@ def unregister():
 
 if __name__ == "__main__":
     register()
-
-
